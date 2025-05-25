@@ -8,10 +8,13 @@ This Python-based tool acts as a real-time **bridge between Philips Dynalite lig
 
 - Listens to Dynet (Dynalite) traffic over TCP via PDEG or similar interface
 - Decodes Dynet1, Dynet2, and Physical Dynet1 packets
+- 100% commands covered, and 95% of friendly descriptions handled/mapped
+- Full XML of all commands possible as of system builder 4.45 under /dynalite/dynalite_messages.xml
 - Publishes decoded data to MQTT in structured JSON
 - Subscribes to MQTT `set` topics to send control commands to Dynalite
 - Built-in logging with emoji-enhanced logs for clarity 🧠📡💬
-
+- Can run from main.py or using docker, via nerih82/dynalite-mqtt
+![Screenshot running docker](image.png)
 ---
 
 ## 🛠 Requirements
