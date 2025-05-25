@@ -1,0 +1,57 @@
+
+for select preset this is the dynet2 structure
+1 = AC // start byte
+2 = 03 // length 3*4 = 12 excluding byte 1 and 2, and checksum (last 2 bytes- 15/16)
+3 = 01 // OPCODE (select preset)
+4 = DA //source device code (EG = DC DA = system builder)
+5 = 00 // ?? unused maybe can be 16 bit source?
+6 = 01 //source box number (1 or something else)
+7 = 00 // target device code (global device message) (DC = Gateway) or skipped here
+8 = 14 // Area in this case
+9 = FF // Join
+10 = 00 // unused?
+11 = 04 // preset (04)
+12 = 00 // unused?
+13 = 00 // unused?
+14 = C8 // 2s fade 
+
+
+
+for update room temp this is the dynet2 structure
+1 = AC // start byte
+2 = 03 // length 3*4 = 12 excluding byte 1 and 2, and checksum (last 2 bytes- 15/16)
+3 = 57 // OPCODE (reply with actual temp)
+4 = DA //source device code (EG = DC DA = system builder)
+5 = 00 // ?? unused maybe can be 16 bit source?
+6 = 01 //source box number (1 or something else)
+7 = 00 // target device code (global device message) (DC = Gateway) or skipped here
+8 = 14 // Area in this case
+9 = FF // Join
+10 = 0C // data 1 set opcode temperature in 0.01 increments
+11 = 17 // 25c
+12 = 50 // 0.8c 
+13 = 00 // unused?
+14 = 00 // unused?
+
+channel recall
+AC,04,10,DA,00,01,00,6A,FF,02,00,65,00,00,00,00,C8,00,18,33
+
+
+1 = AC // start byte
+2 = 04 // length 4*4
+3 = 10 // recall level opcode
+4 = DA //source device code (EG = DC DA = system builder)
+5 = 00 // ?? unused maybe can be 16 bit source?
+6 = 01 //source box number (1 or something else)
+7 = 00 // target device code (global device message) (DC = Gateway) or skipped here
+8 = 14 // Area in this case
+9 = FF // Join
+10 = 02 // recall specific level (00,01,02,03,04 all do different things)
+11 = 00 // 16bit channel number part 1
+12 = 65 // 16bit channel number part 2
+13 = FE // as a % of 254, so 254 = 100% so use FE for that 
+14 = 00 // unused?
+15 = 00 // unused?
+16 = 00 // unused?
+17 = C8 // fade
+18 = 00 // unused?

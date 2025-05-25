@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.swp
+*.log
+.env
+.git
+.dockerignore
+Dockerfile
+launch.json
