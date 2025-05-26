@@ -41,7 +41,9 @@ async def main():
             "type": f"{packet_type}",
             "description" :f"{decode.message}",
             "hex_string": f"{hex_string}",
-            "byte_array" :f"{raw}"
+            "byte_array" :f"{list(raw)}",
+            "template": decode.template,
+            "fields": decode.fields   
         }
         # Publish packet data, but do not retain
         if mqtt_client.client.is_connected:

@@ -6,8 +6,9 @@ from typing import NamedTuple
 class DecodeResult(NamedTuple):
     message: str
     no_error: bool
-
-
+    template: str
+    fields:  List[Union[int, str]]
+    
 class DynetDecoder:
     def __init__(self, xml_path: str):
         self.tree = ET.parse("dynalite/dynalite_messages.xml")
@@ -76,7 +77,7 @@ class DynetDecoder:
             description = f"⚠️ Format error: {e}"
             bStatus = False
 
-        return f"{name} → {description}", bStatus
+        return f"{name} → {description}", bStatus, brief,fields
 
     def _parse_fields(self, proto: ET.Element, packet: bytes) -> List[Union[int, str]]:
         field_values = []
@@ -207,7 +208,7 @@ class DynetDecoder:
         except Exception as e:
             description = f"⚠️ Format error: {e}"
             bStatus = False
-        return f"{name} → {description}", bStatus
+        return f"{name} → {description}", bStatus,brief,fields
 
 
 
@@ -239,10 +240,10 @@ class DynetDecoder:
             cls._instance = cls("dynalite_messages.xml")
         if  len(packet) == 8:
             result = cls._instance.decode_dynet1_packet(packet)
-            return DecodeResult(result[0],result[1])
+            return DecodeResult(result[0],result[1],result[2],result[3])
         elif packet[0] == 0xAC:
             result = cls._instance.decode_dynet2_packet(packet)
-            return DecodeResult(result[0],result[1])
+            return DecodeResult(result[0],result[1],result[2],result[3])
         return DecodeResult("❌ Unknown Dynet packet format",False)
 
     _instance = None
