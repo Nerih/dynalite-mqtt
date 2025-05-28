@@ -71,6 +71,9 @@ async def main():
             if not hex_string and not byte_array:
                 raise KeyError("❌ Must provide either 'hex_string' or 'byte_array'")
             
+            #Optionally get a response ID
+            response_id = data.get("response_id")
+
                     
             # Convert hex string to bytes
             if hex_string:
@@ -118,21 +121,30 @@ async def main():
             print(f"⚠️ Error handling MQTT {MQTT_TOPIC_PREFIX}/Set -> Dynet: {e}")
             # Publish packet data, but do not retain
             if mqtt_client.client.is_connected:
-                payloaderror = {
-                    "status" : f"Error handling MQTT {MQTT_TOPIC_PREFIX}/Set -> Dynet: {e}"
-                }
-                mqtt_client.publish(topic=f"{MQTT_TOPIC_PREFIX}/set/return", payload=json.dumps(payloaderror),retain=False)
+                _publishfail(e,response_id)
             else:    
                 log("❌ MQTT not connected, cannot Publish Error Message")
             return
 
-    def _publishsuccess():
-        payloadsuccess = {
-        "status" : f"OK"
+    def _publishfail(e, response_id=None):
+        payload = {
+            "status": f"Error handling MQTT {MQTT_TOPIC_PREFIX}/Set -> Dynet: {e}"
         }
-        mqtt_client.publish(topic=f"{MQTT_TOPIC_PREFIX}/set/return", payload=json.dumps(payloadsuccess),retain=False)
-                      
-                
+        if response_id:
+            payload_with_id = {**payload, "response_id": response_id}
+            mqtt_client.publish(f"{MQTT_TOPIC_PREFIX}/set/res/{response_id}", json.dumps(payload_with_id), retain=False)
+        mqtt_client.publish(f"{MQTT_TOPIC_PREFIX}/set/res", json.dumps(payload), retain=False)
+
+
+    def _publishsuccess(response_id=None):
+        payload = {
+            "status": "OK"
+        }
+        if response_id:
+            payload_with_id = {**payload, "response_id": response_id}
+            mqtt_client.publish(f"{MQTT_TOPIC_PREFIX}/set/res/{response_id}", json.dumps(payload_with_id), retain=False)
+        mqtt_client.publish(f"{MQTT_TOPIC_PREFIX}/set/res", json.dumps(payload), retain=False)
+            
 
 
     # Assign handlers
