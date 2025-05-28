@@ -1,6 +1,6 @@
 import asyncio
 from datetime import datetime
-from config import PDEG_HOST, PDEG_PORT, MQTT_HOST,MQTT_PORT,MQTT_USERNAME,MQTT_PASSWORD,MQTT_TOPIC_PREFIX
+from config import PDEG_HOST, PDEG_PORT, MQTT_HOST,MQTT_PORT,MQTT_USERNAME,MQTT_PASSWORD,MQTT_TOPIC_PREFIX,DYNET_RATE_LIMIT
 from dynalite.dynalite_client import DynetClient
 from dynalite.dynalite_decoder import DynetDecoder
 from mqtt.publisher import MQTTPublisher
@@ -15,7 +15,7 @@ async def main():
     log("Dynalite → MQTT Bridge starting...")
 
     # Instantiate DynetClient
-    dynet = DynetClient(PDEG_HOST, PDEG_PORT, logger=log)
+    dynet = DynetClient(PDEG_HOST, PDEG_PORT, logger=log,send_rate_limit=DYNET_RATE_LIMIT)
     # Instantiate MQTT Client
     mqtt_client = MQTTPublisher(mqtt_username=MQTT_USERNAME,mqtt_password=MQTT_PASSWORD,mqtt_host=MQTT_HOST,mqtt_port=MQTT_PORT,will_topic=f"{MQTT_TOPIC_PREFIX}/status")
     mqtt_client.subscribe(f"{MQTT_TOPIC_PREFIX}/set")

@@ -15,7 +15,7 @@ def fletcher16(data: bytes) -> int:
     return (sum2 << 8) | sum1
 
 class DynetClient:
-    def __init__(self, host: str = "192.168.0.251", port: int = 50001, reconnect_delay: int = 1, logger: Optional[Callable[[str], None]] = None):
+    def __init__(self, host: str = "192.168.0.251", port: int = 50001, reconnect_delay: int = 1, send_rate_limit: int = 20, logger: Optional[Callable[[str], None]] = None):
         self.host = host
         self.port = port
         self.reconnect_delay = reconnect_delay
@@ -28,33 +28,47 @@ class DynetClient:
         self.on_connect: Optional[Callable[[], None]] = None
         self.on_disconnect: Optional[Callable[[], None]] = None
         self.on_message: Optional[Callable[[str, bytes, dict], None]] = None
-        
         self._send_queue: asyncio.Queue = asyncio.Queue()
-        self.send_rate_limit = 20  # packets/sec
         self._send_task: Optional[asyncio.Task] = None
-
+        self.send_rate_limit = send_rate_limit
 
 
     @property
+    
     def is_connected(self) -> bool:
         """Public property to check if the client is currently connected."""
         return self._connected.is_set()
 
 
     async def _send_worker(self):
-        delay = 1 / self.send_rate_limit
         while not self._stop:
             try:
                 packet = await self._send_queue.get()
+            except Exception as e:
+                self.log(f"❌ Failed to get packet from queue: {e}")
+                await asyncio.sleep(0.1)
+                continue
+
+            try:
                 if self.writer:
-                    self.writer.write(packet)
-                    await self.writer.drain()
-                    self.log(f"       └─ ✅ Sent Dynet via rate limiter: {' '.join(f'{b:02X}' for b in packet)}")
+                    try:
+                        self.writer.write(packet)
+                        await self.writer.drain()
+                        self.log(f"       └─ ✅ Sent Dynet: {' '.join(f'{b:02X}' for b in packet)}")
+                    except Exception as e:
+                        self.log(f"❌ Failed to write packet: {e}")
                 else:
                     self.log("⚠️ Not connected — dropped packet")
             except Exception as e:
-                self.log(f"❌ Send worker error: {e}")
-            await asyncio.sleep(delay)
+                self.log(f"❌ Unexpected send error: {e}")
+
+            try:
+                if self.send_rate_limit > 0:
+                    delay = 1 / self.send_rate_limit
+                    await asyncio.sleep(delay)
+            except Exception as e:
+                self.log(f"❌ Error during rate limiting delay: {e}")
+
 
 
     def log(self, msg: str):
