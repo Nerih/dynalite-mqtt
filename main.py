@@ -71,10 +71,13 @@ async def main():
             if not hex_string and not byte_array:
                 raise KeyError("❌ Must provide either 'hex_string' or 'byte_array'")
             
-            #Optionally get a response ID
+            # Optionally get a response ID
             response_id = data.get("response_id")
+            if not response_id:
+                log("X NO RESPONSE_ID SUPPLIED")
+                _publishfail("Warning: no response_id supplied", response_id=None)
+                #return  # Important: early return to prevent processing untracked commands
 
-                    
             # Convert hex string to bytes
             if hex_string:
                 try:
@@ -98,7 +101,7 @@ async def main():
                 
                 dynet.send_logical(area=raw[1],data1=raw[2],command=raw[3],data2=raw[4],data3=raw[5],join=raw[6],bDecode=True)
                 #log(f"📤 Sent Dynet1 packet: {' '.join(f'{b:02X}' for b in raw)}")
-                _publishsuccess()
+                _publishsuccess(response_id)
             elif packet_type.lower() == "dynet2":
                 #library will handle any type errors
                 #if raw[0] != 0xAC:
@@ -106,7 +109,7 @@ async def main():
             
                 #dynet.writer.write(raw)
                 dynet.send_dynet2(raw,bDecode=True)
-                _publishsuccess()
+                _publishsuccess(response_id)
 
             elif packet_type.lower() == "physical":
                 if len(raw) != 8 or raw[0] != 0x5C:
@@ -114,7 +117,7 @@ async def main():
             
                 #dynet.writer.write(raw)
                 log(f"📤 Sent Physical Dynet1 packet: {' '.join(f'{b:02X}' for b in raw)}")
-                _publishsuccess()
+                _publishsuccess(response_id)
             else:
                 raise LookupError(f"❌ Unknown packet type: {packet_type}")
         except Exception as e:
@@ -131,8 +134,8 @@ async def main():
             "status": f"Error handling MQTT {MQTT_TOPIC_PREFIX}/Set -> Dynet: {e}"
         }
         if response_id:
-            payload_with_id = {**payload, "response_id": response_id}
-            mqtt_client.publish(f"{MQTT_TOPIC_PREFIX}/set/res/{response_id}", json.dumps(payload_with_id), retain=False)
+            payload["response_id"] = response_id
+            mqtt_client.publish(f"{MQTT_TOPIC_PREFIX}/set/res/{response_id}", json.dumps(payload), retain=False)
         mqtt_client.publish(f"{MQTT_TOPIC_PREFIX}/set/res", json.dumps(payload), retain=False)
 
 
@@ -141,10 +144,10 @@ async def main():
             "status": "OK"
         }
         if response_id:
-            payload_with_id = {**payload, "response_id": response_id}
-            mqtt_client.publish(f"{MQTT_TOPIC_PREFIX}/set/res/{response_id}", json.dumps(payload_with_id), retain=False)
+            payload["response_id"] = response_id
+            mqtt_client.publish(f"{MQTT_TOPIC_PREFIX}/set/res/{response_id}", json.dumps(payload), retain=False)
         mqtt_client.publish(f"{MQTT_TOPIC_PREFIX}/set/res", json.dumps(payload), retain=False)
-            
+
 
 
     # Assign handlers
