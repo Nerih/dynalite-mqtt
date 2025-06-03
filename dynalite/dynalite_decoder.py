@@ -122,9 +122,12 @@ class DynetDecoder:
                             #value +=value 
                             preset = int(value)  # fallback if unknown opcode
                         value = preset +1
+
+                    #return value, as return strings here could break integrations
+
                     #map common presets
                     preset_map = {1: "High (1)", 2: "Medium (2)", 3: "Low (3)", 4: "Off (4)"}
-                    value = preset_map.get(value,value) 
+                    #preset_map.get(value,value) 
                 elif mes_type == "MES_TEMPERATURE_VALUE_DYNET1Q7DOT8":
                     high = packet[int(field.find("Byte").text)]
                     low = packet[int(field.findall("Byte")[1].text)]
