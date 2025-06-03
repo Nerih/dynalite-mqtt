@@ -16,7 +16,7 @@ class DynetDecoder:
 
     def decode_dynet1_packet(self, packet: bytes) -> tuple[str, bool]:
         if len(packet) != 8:
-            return "❌ Invalid packet length", False
+            return "❌ Invalid packet length", False, "",[]
 
         bStatus = True    
 
@@ -25,7 +25,7 @@ class DynetDecoder:
 
         proto_root = self.root.find(f".//MessagePrototype[@Byte='0'][@Opcode='0x{header:02x}']")
         if proto_root is None:
-            return f"❓ Unknown Dynet1 header: 0x{header:02X}", False
+            return f"❓ Unknown Dynet1 header: 0x{header:02X}", False, "",[]
 
         sub_proto = None
         for mp in proto_root.findall("MessagePrototype"):
@@ -46,7 +46,7 @@ class DynetDecoder:
                 break
 
         if sub_proto is None:
-                    return f"❓ Unknown Dynet1 Opcode: 0x{packet[3]:02X}", False
+                    return f"❓ Unknown Dynet1 Opcode: 0x{packet[3]:02X}", False, "",[]
 
         byte2_value = packet[2]
         for mp in sub_proto.findall("MessagePrototype"):
@@ -178,18 +178,18 @@ class DynetDecoder:
 
     def decode_dynet2_packet(self, packet: bytes)  -> tuple[str, bool]:
         if len(packet) < 6 or packet[0] != 0xAC:
-            return "❌ Invalid Dynet2 packet", False
+            return "❌ Invalid Dynet2 packet", False, "",[]
         bStatus = True
         header = packet[0]
         length_byte = packet[1]
         expected_len = (length_byte * 4) + 4
         if len(packet) != expected_len:
-            return f"❌ Packet length mismatch (expected {expected_len}, got {len(packet)})", False
+            return f"❌ Packet length mismatch (expected {expected_len}, got {len(packet)})", False, "",[]
 
         # Start with root opcode (Byte 0)
         proto_root = self._find_matching_proto(self.root, 0, packet[0])
         if proto_root is None:
-            return f"❓ Unknown Dynet2 header: 0x{packet[0]:02X}", False
+            return f"❓ Unknown Dynet2 header: 0x{packet[0]:02X}", False, "",[]
 
         # Recursively walk opcode tree: Byte=2 → Byte=9 → Byte=10 etc.
         current_proto = proto_root
@@ -244,6 +244,6 @@ class DynetDecoder:
         elif packet[0] == 0xAC:
             result = cls._instance.decode_dynet2_packet(packet)
             return DecodeResult(result[0],result[1],result[2],result[3])
-        return DecodeResult("❌ Unknown Dynet packet format",False)
+        return DecodeResult("❌ Unknown Dynet packet format",False, "", [])
 
     _instance = None
