@@ -177,8 +177,8 @@ class DynetDecoder:
                 indexed_fields[index] = value
 
 
-                mes_type = field.get("MesType", "").strip()
-                field_types[index] = mes_type
+                #mes_type = field.get("MesType", "").strip()
+                field_types[index] = mes_type.strip()
 
             except Exception as e:
                 print(f"⚠️ Error parsing field: {e}, mes_type:{field.get('MesType')}")
