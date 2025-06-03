@@ -103,6 +103,7 @@ class DynetDecoder:
                     value += ((byte_val & bitmask) >> offset) * multiplier
 
                 mes_type = field.get("MesType", "")
+                mes_type_name = field.get("Name","")
                 if mes_type == "MES_PERIOD_20MS":
                     value = round(value * 0.02, 2)
                 elif mes_type in ("MES_PRESET","MES_PRESET_DYNET2"):
@@ -155,6 +156,9 @@ class DynetDecoder:
                     value = f"{round((value / 255.0) * 100)}%"
                 elif mes_type == ("MES_D2_SERIAL_NUMBER"):
                     value = int.from_bytes(packet[10:13], byteorder='big')
+                elif mes_type == "MES_DECIMAL_VALUE" and mes_type_name == "Current Preset":
+                    #remap mes_type decimal value to preset
+                    mes_type == "MES_PRESET_DYNET2"
                 else:
                     if mes_type:
                         #base_type = field.get("BaseType", "").lower()
