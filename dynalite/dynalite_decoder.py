@@ -106,7 +106,7 @@ class DynetDecoder:
                 mes_type_name = field.get("Name","")
                 if mes_type == "MES_PERIOD_20MS":
                     value = round(value * 0.02, 2)
-                elif mes_type in ("MES_PRESET","MES_PRESET_DYNET2"):
+                elif mes_type in ("MES_PRESET"):
                     #if it is Dynet 2 return value
                     if packet[0] == 0xAC:
                         value += value
