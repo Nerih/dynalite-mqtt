@@ -1,7 +1,7 @@
 import os
 
 PDEG_HOST = os.getenv("PDEG_HOST", "")
-PDEG_PORT = int(os.getenv("PDEG_PORT", 50001))
+PDEG_PORT = int(os.getenv("PDEG_PORT", 50000))
 DYNET_RATE_LIMIT = int(os.getenv("DYNET_RATE_LIMIT", 0))
 
 MQTT_HOST = os.getenv("MQTT_HOST", "")
