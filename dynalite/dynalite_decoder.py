@@ -156,9 +156,9 @@ class DynetDecoder:
                     value = f"{round((value / 255.0) * 100)}%"
                 elif mes_type == ("MES_D2_SERIAL_NUMBER"):
                     value = int.from_bytes(packet[10:13], byteorder='big')
-                elif mes_type == "MES_DECIMAL_VALUE" and mes_type_name == "Current Preset":
+                elif mes_type == "MES_DECIMAL_VALUE" and mes_type_name.upper() == "CURRENT PRESET":
                     #remap mes_type decimal value to preset
-                    mes_type == "MES_PRESET_DYNET2"
+                    mes_type = "MES_PRESET_DYNET2"
                 else:
                     if mes_type:
                         #base_type = field.get("BaseType", "").lower()
@@ -176,8 +176,7 @@ class DynetDecoder:
                 index = int(field.get("index", len(indexed_fields)))
                 indexed_fields[index] = value
 
-
-                #mes_type = field.get("MesType", "").strip()
+                #save mes types to fields.
                 field_types[index] = mes_type.strip()
 
             except Exception as e:
