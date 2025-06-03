@@ -43,7 +43,8 @@ async def main():
             "hex_string": f"{hex_string}",
             "byte_array" :f"{list(raw)}",
             "template": decode.template,
-            "fields": decode.fields   
+            "fields": decode.fields,   
+            "field_types" : decode.field_types
         }
         # Publish packet data, but do not retain
         if mqtt_client.client.is_connected:
@@ -96,9 +97,9 @@ async def main():
                     raise TypeError(f"❌ Invalid byte_array: {e}")
             # Decide based on type
             if packet_type.lower() == "dynet1":
-                if len(raw) != 8:
-                    raise TypeError("❌ Dynet1 packets must be exactly 8 bytes")           
-                
+                #commented out as you must not compute checksum OR pre-pend 1C. 
+                if len(raw) != 7:
+                    raise TypeError(f"❌ Dynet1 packets must be exactly 7 bytes, include 1c, but not the checksum, got len={len(raw)} raw=[{' '.join(f'{b:02X}' for b in raw)}]")                
                 dynet.send_logical(area=raw[1],data1=raw[2],command=raw[3],data2=raw[4],data3=raw[5],join=raw[6],bDecode=True)
                 #log(f"📤 Sent Dynet1 packet: {' '.join(f'{b:02X}' for b in raw)}")
                 _publishsuccess(response_id)

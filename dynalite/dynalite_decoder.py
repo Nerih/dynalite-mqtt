@@ -1,14 +1,15 @@
 import xml.etree.ElementTree as ET
 from typing import List, Union
 from datetime import datetime
-from typing import NamedTuple
+from typing import NamedTuple, Tuple, Dict
 
 class DecodeResult(NamedTuple):
     message: str
     no_error: bool
     template: str
     fields:  List[Union[int, str]]
-    
+    field_types: Dict[int, str] = {}
+
 class DynetDecoder:
     def __init__(self, xml_path: str):
         self.tree = ET.parse("dynalite/dynalite_messages.xml")
@@ -69,7 +70,7 @@ class DynetDecoder:
 
         name = sub_proto.findtext("Name", default="#Todo")
         brief = sub_proto.findtext("VerboseFormatString")
-        fields = self._parse_fields(sub_proto, packet)
+        fields, field_types = self._parse_fields(sub_proto, packet)
 
         try:
             description = brief.format(*fields) if brief else name
@@ -77,11 +78,12 @@ class DynetDecoder:
             description = f"⚠️ Format error: {e}"
             bStatus = False
 
-        return f"{name} → {description}", bStatus, brief,fields
+        return f"{name} → {description}", bStatus, brief,fields,field_types
 
-    def _parse_fields(self, proto: ET.Element, packet: bytes) -> List[Union[int, str]]:
+    def _parse_fields(self, proto: ET.Element, packet: bytes) -> Tuple[List[Union[int, str]], Dict[int, str]]:
         field_values = []
         indexed_fields = {}
+        field_types = {}  # index → MesType
 
         for field in proto.findall("Field"):
             try:
@@ -117,7 +119,8 @@ class DynetDecoder:
                             preset = (bank*8) + (opcode -6)
                         else:
                             #default usually for 0x65 or 0x6B which don't use banks
-                            value +=value 
+                            #value +=value 
+                            preset = int(value)  # fallback if unknown opcode
                         value = preset +1
                     #map common presets
                     preset_map = {1: "High (1)", 2: "Medium (2)", 3: "Low (3)", 4: "Off (4)"}
@@ -166,6 +169,10 @@ class DynetDecoder:
                 index = int(field.get("index", len(indexed_fields)))
                 indexed_fields[index] = value
 
+
+                mes_type = field.get("MesType", "").strip()
+                field_types[index] = mes_type
+
             except Exception as e:
                 print(f"⚠️ Error parsing field: {e}, mes_type:{field.get('MesType')}")
                 index = int(field.get("index", len(indexed_fields)))
@@ -174,7 +181,7 @@ class DynetDecoder:
         # Return as a list in index order
         max_index = max(indexed_fields.keys(), default=-1)
         field_values = [indexed_fields.get(i, "<unset>") for i in range(max_index + 1)]
-        return field_values
+        return field_values, field_types
 
     def decode_dynet2_packet(self, packet: bytes)  -> tuple[str, bool]:
         if len(packet) < 6 or packet[0] != 0xAC:
@@ -201,14 +208,14 @@ class DynetDecoder:
 
         name = current_proto.findtext("Name", default="#Todo")
         brief = current_proto.findtext("VerboseFormatString")
-        fields = self._parse_fields(current_proto, packet)
+        fields, field_types = self._parse_fields(current_proto, packet)
 
         try:
             description = brief.format(*fields) if brief else name
         except Exception as e:
             description = f"⚠️ Format error: {e}"
             bStatus = False
-        return f"{name} → {description}", bStatus,brief,fields
+        return f"{name} → {description}", bStatus,brief,fields,field_types
 
 
 
@@ -240,10 +247,10 @@ class DynetDecoder:
             cls._instance = cls("dynalite_messages.xml")
         if  len(packet) == 8:
             result = cls._instance.decode_dynet1_packet(packet)
-            return DecodeResult(result[0],result[1],result[2],result[3])
+            return DecodeResult(result[0], result[1], result[2], result[3], result[4])
         elif packet[0] == 0xAC:
             result = cls._instance.decode_dynet2_packet(packet)
-            return DecodeResult(result[0],result[1],result[2],result[3])
+            return DecodeResult(result[0], result[1], result[2], result[3], result[4])
         return DecodeResult("❌ Unknown Dynet packet format",False, "", [])
 
     _instance = None
