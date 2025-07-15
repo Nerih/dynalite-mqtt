@@ -109,7 +109,8 @@ class DynetClient:
               
                 # Immediately after appending chunk, enforce buffer size limit from above
                 if len(buffer) >= MAX_BUFFER_SIZE:
-                    logging.error(f"⚠️ Buffer overflow detected ({len(buffer)} bytes). Clearing buffer to resync.")
+                    #enhance logging for buffer overflow.
+                    logging.error(f"⚠️ Buffer overflow detected ({len(buffer)} bytes). Clearing buffer to resync. buffer={' '.join(f'{b:02X}' for b in buffer[:])}")
                     buffer.clear()
                     continue  # Skip further processing until new data arrives
                 
@@ -160,7 +161,7 @@ class DynetClient:
                                 continue
                             else:
                                 #enhance logging for checksum error.
-                                logging.critical(f"⚠️ Invalid checksum! Got {cs:04X}, expected {expected:04X} → packet: {' '.join(f'{b:02X}' for b in packet)} | length={length} total={total_length} buffer_length={len(buffer)} buffer_contents={buffer}")
+                                logging.critical(f"⚠️ Invalid checksum! Got {cs:04X}, expected {expected:04X} → packet: {' '.join(f'{b:02X}' for b in packet)} | length={length} total={total_length} buffer_length={len(buffer)} buffer_contents={' '.join(f'{b:02X}' for b in buffer[:])}")
                                 buffer = buffer[1:]
                                 continue
 
