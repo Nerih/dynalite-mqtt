@@ -169,8 +169,8 @@ class DynetClient:
                         logging.critical(f"⚠️ Desync or unknown header at {buffer[0]:02X}, dropping byte")
                         buffer = buffer[1:]
                         continue
-
-                    break
+                    #commented to drain buffer
+                    #break
         except Exception as e:
             logging.error(f"❌ Listen error: {e}")
         finally:
