@@ -1,28 +1,42 @@
 import asyncio
 from datetime import datetime
-from config import PDEG_HOST, PDEG_PORT, MQTT_HOST,MQTT_PORT,MQTT_USERNAME,MQTT_PASSWORD,MQTT_TOPIC_PREFIX,DYNET_RATE_LIMIT
+from config import PDEG_HOST, PDEG_PORT, MQTT_HOST,MQTT_PORT,MQTT_USERNAME,MQTT_PASSWORD,MQTT_TOPIC_PREFIX,DYNET_RATE_LIMIT,LOG_LEVEL
 from dynalite.dynalite_client import DynetClient
 from dynalite.dynalite_decoder import DynetDecoder
 from mqtt.publisher import MQTTPublisher
 import json
+import logging
+import sys
 
 # Basic logger
-def log(msg: str):
-    print(f"{datetime.now().strftime('%H:%M:%S')} 🧠 {msg}")
+#def log(msg: str):
+#    print(f"{datetime.now().strftime('%H:%M:%S')} 🧠 {msg}")
+
+# ───────────────────────────────────────────────
+# Logging setup
+# ───────────────────────────────────────────────
+logging.basicConfig(
+    level=LOG_LEVEL,
+    format='%(asctime)s.%(msecs)03d %(message)s',
+    datefmt='%H:%M:%S',
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger("🔌 MQTT Bridge")
+
 
 # Entry point for async application
 async def main():
-    log("Dynalite → MQTT Bridge starting...")
+    logger.info("Dynalite → MQTT Bridge starting...")
 
     # Instantiate DynetClient
-    dynet = DynetClient(PDEG_HOST, PDEG_PORT, logger=log,send_rate_limit=DYNET_RATE_LIMIT)
+    dynet = DynetClient(PDEG_HOST, PDEG_PORT, logger=logger,send_rate_limit=DYNET_RATE_LIMIT)
     # Instantiate MQTT Client
     mqtt_client = MQTTPublisher(mqtt_username=MQTT_USERNAME,mqtt_password=MQTT_PASSWORD,mqtt_host=MQTT_HOST,mqtt_port=MQTT_PORT,will_topic=f"{MQTT_TOPIC_PREFIX}/status")
     mqtt_client.subscribe(f"{MQTT_TOPIC_PREFIX}/set")
 
     # Async connection callback
     async def on_dynet_connect():
-        log("🌐 Connected — ready to receive Dynet packets")
+        logger.info("🌐 Connected — ready to receive Dynet packets")
         # You can call dynet.send_logical(...) here to test
         # Example: dynet.send_logical(area=10, command=0x4A, data1=0x0C, data2=25, data3=0, join=0xFF)
         #dynet.send_dynet2([0x80,0xDA,0x00,0x01,0x4C,0x00,0x27,0x0A],bDecode=True)
@@ -32,7 +46,7 @@ async def main():
     def handle_dynet_message(packet_type: str, raw: bytes, parsed: dict):
         hex_string = ' '.join(f"{b:02X}" for b in raw)
         decode = DynetDecoder.decode(raw)
-        log(f"       └─ 💬 {decode.message}")
+        logger.info(f"       └─ 💬 {decode.message}")
 
         # 🔗 Place to publish parsed data to MQTT
         # Example:
@@ -50,12 +64,12 @@ async def main():
         if mqtt_client.client.is_connected:
             mqtt_client.publish(topic=f"{MQTT_TOPIC_PREFIX}", payload=json.dumps(packet_payload),retain=False)
         else:    
-            log("❌ MQTT not connected, cannot Publish DYNET message to MQTT")
+            logger.error("❌ MQTT not connected, cannot Publish DYNET message to MQTT")
 
 
     def handle_mqtt_command(topic, payload):
         if not dynet.is_connected:
-            log("⚠️ DYNET not connected, cannot send DYNET message from MQTT")
+            logger.error("⚠️ DYNET not connected, cannot send DYNET message from MQTT")
             return
         
         try:
@@ -75,7 +89,7 @@ async def main():
             # Optionally get a response ID
             response_id = data.get("response_id")
             if not response_id:
-                log("X NO RESPONSE_ID SUPPLIED")
+                logger.warning("X NO RESPONSE_ID SUPPLIED")
                 _publishfail("Warning: no response_id supplied", response_id=None)
                 #return  # Important: early return to prevent processing untracked commands
 
@@ -117,17 +131,17 @@ async def main():
                     raise TypeError("❌ Physical Dynet1 packet must start with 0x5C and be 8 bytes long")
             
                 #dynet.writer.write(raw)
-                log(f"📤 Sent Physical Dynet1 packet: {' '.join(f'{b:02X}' for b in raw)}")
+                logger.info(f"📤 Sent Physical Dynet1 packet: {' '.join(f'{b:02X}' for b in raw)}")
                 _publishsuccess(response_id)
             else:
                 raise LookupError(f"❌ Unknown packet type: {packet_type}")
         except Exception as e:
-            print(f"⚠️ Error handling MQTT {MQTT_TOPIC_PREFIX}/Set -> Dynet: {e}")
+            logger.error(f"⚠️ Error handling MQTT {MQTT_TOPIC_PREFIX}/Set -> Dynet: {e}")
             # Publish packet data, but do not retain
             if mqtt_client.client.is_connected:
                 _publishfail(e,response_id)
             else:    
-                log("❌ MQTT not connected, cannot Publish Error Message")
+                logger.error("❌ MQTT not connected, cannot Publish Error Message")
             return
 
     def _publishfail(e, response_id=None):
@@ -158,27 +172,27 @@ async def main():
 
     try:
         await dynet.connect()
-        log("🔁 Listening for packets. Press Ctrl+C to exit.")
+        logger.info("🔁 Listening for packets. Press Ctrl+C to exit.")
         while True:
             await asyncio.sleep(1)  # Passive loop
 
     except asyncio.CancelledError:
-        log("⏹ Cancelled by asyncio.")
+        logger.info("⏹ Cancelled by asyncio.")
 
     except KeyboardInterrupt:
-        log("🛑 Stopped by user.")
+        logger.info("🛑 Stopped by user.")
 
     except Exception as e:
-        log(f"❌ Unexpected error: {e}")
+        logger.error(f"❌ Unexpected error: {e}")
 
     finally:
         dynet.stop()
         await asyncio.sleep(0.5)
-        log("🔍 Shutdown complete.")
+        logger.info("🔍 Shutdown complete.")
 
 # Bootstrap runner
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except Exception as e:
-        log(f"❌ Fatal startup error: {e}")
+        logger.error(f"❌ Fatal startup error: {e}")

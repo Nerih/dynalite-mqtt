@@ -2,6 +2,8 @@ import xml.etree.ElementTree as ET
 from typing import List, Union
 from datetime import datetime
 from typing import NamedTuple, Tuple, Dict
+import logging
+logger = logging.getLogger("🔌 MQTT Bridge")
 
 class DecodeResult(NamedTuple):
     message: str
@@ -171,7 +173,7 @@ class DynetDecoder:
                         #elif base_type:
                         #    print(f"{datetime.now().strftime('%H:%M:%S')}       ├─ ℹ️  Unknown BaseType: {base_type}")
                         #else:
-                            print(f"{datetime.now().strftime('%H:%M:%S')}       ├─ ℹ️  Unhandled MesType: {mes_type}")
+                            logging.info(f"{datetime.now().strftime('%H:%M:%S')}       ├─ ℹ️  Unhandled MesType: {mes_type}")
 
                 index = int(field.get("index", len(indexed_fields)))
                 indexed_fields[index] = value
@@ -180,7 +182,7 @@ class DynetDecoder:
                 field_types[index] = mes_type.strip()
 
             except Exception as e:
-                print(f"⚠️ Error parsing field: {e}, mes_type:{field.get('MesType')}")
+                logging.error(f"⚠️ Error parsing field: {e}, mes_type:{field.get('MesType')}")
                 index = int(field.get("index", len(indexed_fields)))
                 indexed_fields[index] = "<err>"
 

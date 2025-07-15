@@ -2,6 +2,8 @@ import paho.mqtt.client as mqtt
 import json
 from datetime import datetime
 from typing import Callable, Optional
+import logging
+logger = logging.getLogger("🔌 MQTT Bridge")
 
 class MQTTPublisher:
     
@@ -22,7 +24,7 @@ class MQTTPublisher:
         on_connect=None,
         on_disconnect=None,
         on_message=None,
-        logger: Optional[Callable[[str], None]] = None
+        #logger: Optional[Callable[[str], None]] = None
     ):
         """
         Initialize MQTT client with optional callbacks and LWT.
@@ -57,7 +59,7 @@ class MQTTPublisher:
         self.will_retain = will_retain
 
         #logging
-        self.logger = logger or (lambda msg: print(f"{datetime.now().strftime('%H:%M:%S')} 📡🧾 MQTT Client:{msg}"))
+        #logging.infoger = logger or (lambda msg: print(f"{datetime.now().strftime('%H:%M:%S')} 📡🧾 MQTT Client:{msg}"))
 
 
         # Set Last Will and Testament (LWT)
@@ -72,14 +74,14 @@ class MQTTPublisher:
 
         # Try to connect
         try:
-            self.log(f"🔌 Connecting to MQTT at {mqtt_host}:{mqtt_port}...")
+            logging.info(f"🔌 Connecting to MQTT at {mqtt_host}:{mqtt_port}...")
             self.client.connect(mqtt_host, mqtt_port, keepalive=60)
             self.client.loop_start()
         except Exception as e:
-            self.log(f"❌ TCP connect error: {e}")
+            logging.error(f"❌ TCP connect error: {e}")
 
-    def log(self, msg: str):
-        self.logger(msg)
+    #def log(self, msg: str):
+     #   logging.infoger(msg)
 
     def _on_connect(self, client, userdata, flags, rc):
         """
@@ -87,23 +89,23 @@ class MQTTPublisher:
         Calls external callback if provided.
         """
         if rc == 0:
-            self.log(f" ✅ connected successfully")
+            logging.info(f" ✅ connected successfully")
             if hasattr(self, "will_topic") and self.will_topic:
                 self.client.publish(self.will_topic, "online", retain=self.will_retain)
 
             if self.on_connect:
                 self.on_connect(client, userdata, flags, rc)
         elif rc == 4:
-            self.log(f"❌ authentication failed (bad username/password)")
+            logging.error(f"❌ authentication failed (bad username/password)")
         else:
-            self.log(f"❌ connection failed with result code {rc}")
+            logging.error(f"❌ connection failed with result code {rc}")
 
     def _on_disconnect(self, client, userdata, rc):
         """
         Internal callback for MQTT disconnection event.
         Calls external callback if provided.
         """
-        self.log(f"⚠️ Disconnected from MQTT (code {rc})")
+        logging.critical(f"⚠️ Disconnected from MQTT (code {rc})")
         if self.on_disconnect:
             self.on_disconnect(client, userdata, rc)
 
@@ -115,14 +117,14 @@ class MQTTPublisher:
         try:
             topic = msg.topic
             payload = msg.payload.decode()
-            self.log(f"📨 command: {topic} = {payload}")
+            logging.info(f"📨 command: {topic} = {payload}")
 
             # Pass to external handler
             if self.on_message:
                 self.on_message(topic, payload)
 
         except Exception as e:
-            self.log(f"❌ Error processing MQTT message: {e}")
+            logging.error(f"❌ Error processing MQTT message: {e}")
 
     def publish(self, topic: str, payload, qos=0, retain=False) -> bool:
         """
@@ -140,13 +142,13 @@ class MQTTPublisher:
                 payload = json.dumps(payload)
             result = self.client.publish(topic, payload=payload, qos=qos, retain=retain)
             if result.rc == mqtt.MQTT_ERR_SUCCESS:
-                self.log(f"📤 Published to topic: {topic}")
+                logging.info(f"📤 Published to topic: {topic}")
                 return True
             else:
-                self.log(f" ❌  Failed to publish to {topic}, rc={result.rc}")
+                logging.error(f" ❌  Failed to publish to {topic}, rc={result.rc}")
                 return False
         except Exception as e:
-            self.log(f" ❌ Exception during publish to {topic}: {e}")
+            logging.error(f" ❌ Exception during publish to {topic}: {e}")
             return False
 
     def subscribe(self, topic: str, qos=0):
@@ -158,17 +160,17 @@ class MQTTPublisher:
         """
         try:
             self.client.subscribe(topic, qos=qos)
-            self.log(f"📡 Subscribed to {topic}")
+            logging.info(f"📡 Subscribed to {topic}")
         except Exception as e:
-            self.log(f"❌ Subscription error for {topic}: {e}")
+            logging.error(f"❌ Subscription error for {topic}: {e}")
 
     def stop(self):
         """
         Cleanly stop the MQTT client.
         """
         try:
-            self.log(f"🔌 Stopping...")
+            logging.info(f"🔌 Stopping...")
             self.client.loop_stop()
             self.client.disconnect()
         except Exception as e:
-            self.log(f"❌ Error while stopping: {e}")
+            logging.error(f"❌ Error while stopping: {e}")

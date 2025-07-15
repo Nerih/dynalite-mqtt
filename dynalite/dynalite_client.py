@@ -3,6 +3,8 @@ from datetime import datetime
 from typing import Callable, Optional
 from dynalite.dynalite_decoder import DynetDecoder
 from config import MAX_BUFFER_SIZE
+import logging
+logger = logging.getLogger("🔌 MQTT Bridge")
 
 def calc_checksum(packet: list[int]) -> int:
     return (-sum(packet) & 0xFF)
@@ -25,7 +27,7 @@ class DynetClient:
         self._stop = False
         self._connected = asyncio.Event()
         self._task: Optional[asyncio.Task] = None
-        self.logger = logger or (lambda msg: print(f"{datetime.now().strftime('%H:%M:%S')} 🧠 {msg}"))
+        #logging.infoger = logger or (lambda msg: print(f"{datetime.now().strftime('%H:%M:%S')} 🧠 {msg}"))
         self.on_connect: Optional[Callable[[], None]] = None
         self.on_disconnect: Optional[Callable[[], None]] = None
         self.on_message: Optional[Callable[[str, bytes, dict], None]] = None
@@ -46,7 +48,7 @@ class DynetClient:
             try:
                 packet = await self._send_queue.get()
             except Exception as e:
-                self.log(f"❌ Failed to get packet from queue: {e}")
+                logging.error(f"❌ Failed to get packet from queue: {e}")
                 await asyncio.sleep(0.1)
                 continue
 
@@ -55,25 +57,25 @@ class DynetClient:
                     try:
                         self.writer.write(packet)
                         await self.writer.drain()
-                        self.log(f"       └─ ✅ Sent Dynet: {' '.join(f'{b:02X}' for b in packet)}")
+                        logging.info(f"       └─ ✅ Sent Dynet: {' '.join(f'{b:02X}' for b in packet)}")
                     except Exception as e:
-                        self.log(f"❌ Failed to write packet: {e}")
+                        logging.error(f"❌ Failed to write packet: {e}")
                 else:
-                    self.log("⚠️ Not connected — dropped packet")
+                    logging.error("⚠️ Not connected — dropped packet")
             except Exception as e:
-                self.log(f"❌ Unexpected send error: {e}")
+                logging.error(f"❌ Unexpected send error: {e}")
 
             try:
                 if self.send_rate_limit > 0:
                     delay = 1 / self.send_rate_limit
                     await asyncio.sleep(delay)
             except Exception as e:
-                self.log(f"❌ Error during rate limiting delay: {e}")
+                logging.error(f"❌ Error during rate limiting delay: {e}")
 
 
 
-    def log(self, msg: str):
-        self.logger(msg)
+    #def log(self, msg: str):
+    #    logging.infoger(msg)
 
     async def connect(self):
         self._task = asyncio.create_task(self._connection_loop())
@@ -84,14 +86,14 @@ class DynetClient:
             try:
                 self.reader, self.writer = await asyncio.open_connection(self.host, self.port)
                 self._connected.set()
-                self.log(f"✅ Connected to Dynet IP at {self.host}:{self.port}")
+                logging.info(f"✅ Connected to Dynet IP at {self.host}:{self.port}")
                 if self.on_connect:
                     await self.on_connect()
                 await self._listen()
             except Exception as e:
-                self.log(f"❌ Dynet IP Connection error: {e}")
+                logging.error(f"❌ Dynet IP Connection error: {e}")
                 self._connected.clear()
-            self.log(f"🔄 Dynet IP Reconnecting in {self.reconnect_delay} seconds...")
+            logging.warning(f"🔄 Dynet IP Reconnecting in {self.reconnect_delay} seconds...")
             await asyncio.sleep(self.reconnect_delay)
 
     async def _listen(self):
@@ -101,13 +103,13 @@ class DynetClient:
                 
                 chunk = await self.reader.read(MAX_BUFFER_SIZE) #CHANGED to read from ENV
                 if not chunk:
-                    self.log("🔌 Connection closed by Dynet")
+                    logging.warning("🔌 Connection closed by Dynet")
                     break
                 buffer += chunk
               
                 # Immediately after appending chunk, enforce buffer size limit from above
                 if len(buffer) >= MAX_BUFFER_SIZE:
-                    self.log(f"⚠️ Buffer overflow detected ({len(buffer)} bytes). Clearing buffer to resync.")
+                    logging.error(f"⚠️ Buffer overflow detected ({len(buffer)} bytes). Clearing buffer to resync.")
                     buffer.clear()
                     continue  # Skip further processing until new data arrives
                 
@@ -115,7 +117,7 @@ class DynetClient:
                     if buffer[0] == 0x1C and len(buffer) >= 8:
                         packet = buffer[:8]
                         if packet[7] == calc_checksum(packet[:7]):
-                            self.log(f"🔜 Dynet1 (Logical): {' '.join(f'{b:02X}' for b in packet)}")
+                            logging.info(f"🔜 Dynet1 (Logical): {' '.join(f'{b:02X}' for b in packet)}")
                             if self.on_message:
                                 self.on_message("dynet1", packet, {"header": packet[0], "command": packet[3]})
                             buffer = buffer[8:]
@@ -124,7 +126,7 @@ class DynetClient:
                     elif buffer[0] == 0x5C and len(buffer) >= 8:
                         packet = buffer[:8]
                         if packet[7] == calc_checksum(packet[:7]):
-                            self.log(f"🔧 Dynet1 (Physical): {' '.join(f'{b:02X}' for b in packet)}")
+                            logging.info(f"🔧 Dynet1 (Physical): {' '.join(f'{b:02X}' for b in packet)}")
                             if self.on_message:
                                 self.on_message("dynet1-physical", packet, {"header": packet[0], "command": packet[3]})
                             buffer = buffer[8:]
@@ -137,7 +139,7 @@ class DynetClient:
                                 text = bytes(packet[1:7]).decode("ascii", errors="replace")
                             except Exception:
                                 text = "<decode error>"
-                            self.log(f"💬 Dynet1 (Debug): {' '.join(f'{b:02X}' for b in packet)} → \"{text}\"")
+                            logging.info(f"💬 Dynet1 (Debug): {' '.join(f'{b:02X}' for b in packet)} → \"{text}\"")
                             if self.on_message:
                                 self.on_message("dynet1-debug", packet, {"text": text})
                             buffer = buffer[8:]
@@ -151,24 +153,24 @@ class DynetClient:
                             cs = fletcher16(packet[:-2])
                             expected = int.from_bytes(packet[-2:], 'big')
                             if cs == expected:
-                                self.log(f"🌐 Dynet2: {' '.join(f'{b:02X}' for b in packet)}")
+                                logging.info(f"🌐 Dynet2: {' '.join(f'{b:02X}' for b in packet)}")
                                 if self.on_message:
                                     self.on_message("dynet2", packet, {"length": length})
                                 buffer = buffer[total_length:]
                                 continue
                             else:
-                                self.log(f"⚠️ Invalid checksum! Got {cs:04X}, expected {expected:04X} → packet: {' '.join(f'{b:02X}' for b in packet)}")
+                                logging.critical(f"⚠️ Invalid checksum! Got {cs:04X}, expected {expected:04X} → packet: {' '.join(f'{b:02X}' for b in packet)}")
                                 buffer = buffer[1:]
                                 continue
 
                     else:
-                        self.log(f"⚠️ Desync or unknown header at {buffer[0]:02X}, dropping byte")
+                        logging.critical(f"⚠️ Desync or unknown header at {buffer[0]:02X}, dropping byte")
                         buffer = buffer[1:]
                         continue
 
                     break
         except Exception as e:
-            self.log(f"❌ Listen error: {e}")
+            logging.error(f"❌ Listen error: {e}")
         finally:
             self._connected.clear()
             if self.writer:
@@ -189,13 +191,13 @@ class DynetClient:
                 raise Exception(f"🚫 Packet did not decode successfully — {result.message}")
         if self.writer:
             self._send_queue.put_nowait(bytearray(packet))
-            self.log(f"📤 Queued Dynet1 Logical: {' '.join(f'{b:02X}' for b in packet)}")
+            logging.info(f"📤 Queued Dynet1 Logical: {' '.join(f'{b:02X}' for b in packet)}")
             if bDecode:
-                self.log(f"       └─ 💬 {result.message}")
+                logging.info(f"       └─ 💬 {result.message}")
         else:
             raise Exception("⚠️ Cannot send — not connected.")
         #except Exception as e:
-        #    self.log(f"❌ Send error: {e}")
+        #    logging.info(f"❌ Send error: {e}")
 
     def send_physical(self, area: int, command: int, data1: int, data2: int, data3: int, join: int, bDecode: bool = True):
         #try:
@@ -208,13 +210,13 @@ class DynetClient:
                 raise Exception(f"🚫 Packet did not decode successfully — {result.message}")
         if self.writer:
             self._send_queue.put_nowait(bytearray(packet))
-            self.log(f"📤 Queued Dynet1 Physical: {' '.join(f'{b:02X}' for b in packet)}")
+            logging.info(f"📤 Queued Dynet1 Physical: {' '.join(f'{b:02X}' for b in packet)}")
             if bDecode:
-                self.log(f"       └─ 💬 {result.message}")
+                logging.info(f"       └─ 💬 {result.message}")
         else:
-            self.log("⚠️ Cannot send — not connected.")
+            logging.critical("⚠️ Cannot send — not connected.")
         #except Exception as e:
-        #    self.log(f"❌ Send error: {e}")
+        #    logging.info(f"❌ Send error: {e}")
 
     def send_dynet2(self, payload: list[int], bDecode: bool = True):
         #try:
@@ -257,13 +259,13 @@ class DynetClient:
         # Send via queue
         if self.writer:
             self._send_queue.put_nowait(bytearray(final_packet))
-            self.log(f"📤 Queued Dynet2: {' '.join(f'{b:02X}' for b in final_packet)}")
+            logging.info(f"📤 Queued Dynet2: {' '.join(f'{b:02X}' for b in final_packet)}")
             if bDecode:
-                self.log(f"       └─ 💬 {result.message}")
+                logging.info(f"       └─ 💬 {result.message}")
         else:
-            self.log("⚠️ Cannot send — not connected.")
+            logging.critical("⚠️ Cannot send — not connected.")
         #except Exception as e:
-        #    self.log(f"❌ Send Dynet2 error: {e}")
+        #    logging.info(f"❌ Send Dynet2 error: {e}")
 
 
     def stop(self):

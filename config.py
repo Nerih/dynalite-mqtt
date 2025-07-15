@@ -1,5 +1,6 @@
 import os
 
+LOG_LEVEL = os.getenv("LOG_LEVEL", "ERROR")
 PDEG_HOST = os.getenv("PDEG_HOST", "")
 PDEG_PORT = int(os.getenv("PDEG_PORT", 50000))
 DYNET_RATE_LIMIT = int(os.getenv("DYNET_RATE_LIMIT", 0))
