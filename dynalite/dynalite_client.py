@@ -172,7 +172,7 @@ class DynetClient:
                         buffer = buffer[1:]
                         continue
                     #commented to drain buffer
-                    #break
+                    break
         except Exception as e:
             logging.error(f"❌ Listen error: {e}")
         finally:
