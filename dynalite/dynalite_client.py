@@ -159,7 +159,8 @@ class DynetClient:
                                 buffer = buffer[total_length:]
                                 continue
                             else:
-                                logging.critical(f"⚠️ Invalid checksum! Got {cs:04X}, expected {expected:04X} → packet: {' '.join(f'{b:02X}' for b in packet)}")
+                                #enhance logging for checksum error.
+                                logging.critical(f"⚠️ Invalid checksum! Got {cs:04X}, expected {expected:04X} → packet: {' '.join(f'{b:02X}' for b in packet)} | length={length} total={total_length} buffer_length={len(buffer)} buffer_contents={buffer}")
                                 buffer = buffer[1:]
                                 continue
 
