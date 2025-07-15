@@ -164,7 +164,9 @@ class DynetClient:
                                 logging.critical(f"⚠️ Invalid checksum! Got {cs:04X}, expected {expected:04X} → packet: {' '.join(f'{b:02X}' for b in packet)} | length={length} total={total_length} buffer_length={len(buffer)} buffer_contents={' '.join(f'{b:02X}' for b in buffer[:])}")
                                 buffer = buffer[1:]
                                 continue
-
+                        else:
+                            # ⏳ Not enough bytes yet — exit to await more TCP data
+                            break    
                     else:
                         logging.critical(f"⚠️ Desync or unknown header at {buffer[0]:02X}, dropping byte")
                         buffer = buffer[1:]
