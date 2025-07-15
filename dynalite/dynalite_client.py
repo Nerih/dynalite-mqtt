@@ -2,6 +2,7 @@ import asyncio
 from datetime import datetime
 from typing import Callable, Optional
 from dynalite.dynalite_decoder import DynetDecoder
+from config import MAX_BUFFER_SIZE
 
 def calc_checksum(packet: list[int]) -> int:
     return (-sum(packet) & 0xFF)
@@ -97,12 +98,19 @@ class DynetClient:
         buffer = bytearray()
         try:
             while not self._stop:
-                chunk = await self.reader.read(2048)
+                
+                chunk = await self.reader.read(MAX_BUFFER_SIZE) #CHANGED to read from ENV
                 if not chunk:
                     self.log("🔌 Connection closed by Dynet")
                     break
                 buffer += chunk
-
+              
+                # Immediately after appending chunk, enforce buffer size limit from above
+                if len(buffer) >= MAX_BUFFER_SIZE:
+                    self.log(f"⚠️ Buffer overflow detected ({len(buffer)} bytes). Clearing buffer to resync.")
+                    buffer.clear()
+                    continue  # Skip further processing until new data arrives
+                
                 while buffer:
                     if buffer[0] == 0x1C and len(buffer) >= 8:
                         packet = buffer[:8]
