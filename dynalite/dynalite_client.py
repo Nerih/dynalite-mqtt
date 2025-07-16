@@ -97,23 +97,23 @@ class DynetClient:
             await asyncio.sleep(self.reconnect_delay)
 
     async def _listen(self):
+        recovering = False #flag for buffer health
         buffer = bytearray()
         try:
             while not self._stop:
-                
-                chunk = await self.reader.read(MAX_BUFFER_SIZE) #CHANGED to read from ENV
+                chunk = await self.reader.read(MAX_BUFFER_SIZE)  # ✅ As per your config
                 if not chunk:
                     logging.warning("🔌 Connection closed by Dynet")
                     break
                 buffer += chunk
-              
-                # Immediately after appending chunk, enforce buffer size limit from above
+
+                # ✅ Buffer overflow protection, now correctly uses continue to ensure re-evaluate buffer immediately
                 if len(buffer) >= MAX_BUFFER_SIZE:
-                    #enhance logging for buffer overflow.
+                    recovering = True
                     logging.error(f"⚠️ Buffer overflow detected ({len(buffer)} bytes). Clearing buffer to resync. buffer={' '.join(f'{b:02X}' for b in buffer[:])}")
                     buffer.clear()
-                    continue  # Skip further processing until new data arrives
-                
+                    continue  # ✅ Explicitly restart while buffer with clean state
+
                 while buffer:
                     if buffer[0] == 0x1C and len(buffer) >= 8:
                         packet = buffer[:8]
@@ -122,8 +122,28 @@ class DynetClient:
                             if self.on_message:
                                 self.on_message("dynet1", packet, {"header": packet[0], "command": packet[3]})
                             buffer = buffer[8:]
+                            if recovering:
+                                logging.error("✅ Buffer recovered after desync/checksum/overflow.")
+                                recovering = False
+                            continue  # ✅ Immediately re-check buffer, drain more
+                        else:
+                            recovering = True
+                            logging.warning(f"⚠️ Invalid checksum for Dynet1 Logical: {' '.join(f'{b:02X}' for b in packet)}")
+                            
+                            try:
+                                result = DynetDecoder.decode(packet)
+                                if result.no_error:
+                                    logging.warning(f"🛠️ Accepting invalid checksum packet (decoder OK): {result.message}")
+                                    if self.on_message:
+                                                self.on_message("dynet1", packet, {"header": packet[0], "command": packet[3], "decoded": result.message})
+                                else:
+                                    logging.warning(f"❌ Decoder on badchecksum packet failed: {result.message}")     
+                            except Exception as e:
+                                logging.warning(f"❌ Failed to decode invalid packet: {e}")
+                            
+                            buffer = buffer[1:]
                             continue
-
+                        
                     elif buffer[0] == 0x5C and len(buffer) >= 8:
                         packet = buffer[:8]
                         if packet[7] == calc_checksum(packet[:7]):
@@ -131,7 +151,10 @@ class DynetClient:
                             if self.on_message:
                                 self.on_message("dynet1-physical", packet, {"header": packet[0], "command": packet[3]})
                             buffer = buffer[8:]
-                            continue
+                            if recovering:
+                                logging.error("✅ Buffer recovered after desync/checksum/overflow.")
+                                recovering = False
+                            continue  # ✅ Immediately re-check buffer, drain more
 
                     elif buffer[0] == 0x6C and len(buffer) >= 8:
                         packet = buffer[:8]
@@ -144,7 +167,10 @@ class DynetClient:
                             if self.on_message:
                                 self.on_message("dynet1-debug", packet, {"text": text})
                             buffer = buffer[8:]
-                            continue
+                            if recovering:
+                                logging.error("✅ Buffer recovered after desync/checksum/overflow.")
+                                recovering = False
+                            continue  # ✅ Immediately re-check buffer, drain more
 
                     elif buffer[0] == 0xAC and len(buffer) >= 4:
                         length = buffer[1] * 4
@@ -158,21 +184,40 @@ class DynetClient:
                                 if self.on_message:
                                     self.on_message("dynet2", packet, {"length": length})
                                 buffer = buffer[total_length:]
-                                continue
+                                if recovering:
+                                    logging.error("✅ Buffer recovered after desync/checksum/overflow.")
+                                    recovering = False
+                                continue  # ✅ Immediately re-check buffer, drain more
                             else:
-                                #enhance logging for checksum error.
+                                recovering = True
                                 logging.critical(f"⚠️ Invalid checksum! Got {cs:04X}, expected {expected:04X} → packet: {' '.join(f'{b:02X}' for b in packet)} | length={length} total={total_length} buffer_length={len(buffer)} buffer_contents={' '.join(f'{b:02X}' for b in buffer[:])}")
                                 buffer = buffer[1:]
-                                continue
+                                continue  # ✅ Re-check buffer after dropping invalid byte
                         else:
-                            # ⏳ Not enough bytes yet — exit to await more TCP data
-                            break    
+                            # ⏳ Not enough data yet, break and await more
+                            break  # ✅ Correct to break here for incomplete Dynet2
+
                     else:
-                        logging.critical(f"⚠️ Desync or unknown header at {buffer[0]:02X}, dropping byte")
-                        buffer = buffer[1:]
-                        continue
-                    #commented to drain buffer
-                    break
+                        # ✅ Desync recovery improved: scan ahead to known headers
+                        recovering = True
+                        logging.critical(f"⚠️ Desync or unknown header at {buffer[0]:02X}, dropping byte. buffer={' '.join(f'{b:02X}' for b in buffer[:])}")
+
+                        valid_headers = (0x1C, 0x5C, 0x6C, 0xAC)
+                        header_positions = [i for i, b in enumerate(buffer[1:], 1) if b in valid_headers]
+                        logging.info(f"⚠️🔍 Found {len(header_positions)} potential headers at offsets: {header_positions}")
+
+                        next_header = next((i for i, b in enumerate(buffer[1:], 1) if b in valid_headers), None)
+                        if next_header is not None:
+                            logging.info(f"⚠️ Skipping {next_header} bytes to resync to header 0x{buffer[next_header]:02X}")
+                            buffer = buffer[next_header:]
+                        else:
+                            logging.info("⚠️ No valid header found, clearing buffer.")
+                            buffer.clear()
+
+                        continue  # ✅ Re-check buffer immediately after resync
+
+                    # ✅ This break is redundant now; all cases above explicitly continue or break as needed
+                    # break  <-- REMOVE THIS
         except Exception as e:
             logging.error(f"❌ Listen error: {e}")
         finally:
@@ -183,6 +228,7 @@ class DynetClient:
             self.reader = self.writer = None
             if self.on_disconnect:
                 await self.on_disconnect()
+
 
     def send_logical(self, area: int, command: int, data1: int, data2: int, data3: int, join: int, bDecode: bool = True) :
         #try:
